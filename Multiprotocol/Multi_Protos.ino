@@ -191,6 +191,7 @@ const char STR_SUBTYPE_E129[] =       "\x04""E129""C186";
 const char STR_SUBTYPE_FX[] =         "\x05""816\0 ""620\0 ""9630\0""Q560\0""QF012";
 const char STR_SUBTYPE_SGF22[] =      "\x04""F22\0""F22S""J20\0""CX10";
 const char STR_SUBTYPE_JIABAILE[] =   "\x04""Std\0""Gyro";
+const char STR_SUBTYPE_CFLIE[] =      "\x07""Auto\0  ""2Mbps\0 ""1Mbps\0 ""250kbps";
 #define NO_SUBTYPE		nullptr
 
 #ifdef SEND_CPPM
@@ -254,7 +255,7 @@ const mm_protocol_definition multi_protocols[] = {
 		{PROTO_CABELL,     STR_CABELL,    STR_SUBTYPE_CABELL,    8, OPTION_OPTION,  0, 0, SW_NRF,    CABELL_init,     CABELL_callback     },
 	#endif
 	#if defined(CFLIE_NRF24L01_INO)
-		{PROTO_CFLIE,      STR_CFLIE,     NO_SUBTYPE,            0, OPTION_NONE,    0, 0, SW_NRF,    CFLIE_init,      CFLIE_callback      }, // review protocol
+		{PROTO_CFLIE,      STR_CFLIE,     STR_SUBTYPE_CFLIE,     4, OPTION_RFCHAN,  0, 0, SW_NRF,    CFLIE_init,      CFLIE_callback      }, // review protocol
 	#endif
 	#if defined(CG023_NRF24L01_INO)
 		{PROTO_CG023,      STR_CG023,     STR_SUBTYPE_CG023,     2, OPTION_NONE,    0, 0, SW_NRF,    CG023_init,      CG023_callback      },
