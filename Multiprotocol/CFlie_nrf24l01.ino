@@ -233,26 +233,26 @@ static void send_search_packet()
 	NRF24L01_WriteReg(NRF24L01_07_STATUS, (BV(NRF24L01_07_TX_DS) | BV(NRF24L01_07_MAX_RT)));
 	NRF24L01_FlushTx();
 
-	if (sub_protocol == CFLIE_AUTO)
-  {
-	  if (rf_ch_num++ > 125)
-	  {
+    if (rf_ch_num++ > 125)
+	{
 	    rf_ch_num = 0;
-	    switch(data_rate)
-		  {
-		    case NRF24L01_BR_250K:
-			    data_rate = NRF24L01_BR_1M;
-			    break;
-			  case NRF24L01_BR_1M:
-			    data_rate = NRF24L01_BR_2M;
-			    break;
-			  case NRF24L01_BR_2M:
-			    data_rate = NRF24L01_BR_250K;
-			    break;
-		  }
-	  }
-  }
-  set_rate_channel(data_rate, rf_ch_num);
+        if (sub_protocol == CFLIE_AUTO)
+        {
+	        switch(data_rate)
+		    {
+		        case NRF24L01_BR_250K:
+			        data_rate = NRF24L01_BR_1M;
+			        break;
+			    case NRF24L01_BR_1M:
+			        data_rate = NRF24L01_BR_2M;
+			        break;
+			    case NRF24L01_BR_2M:
+			        data_rate = NRF24L01_BR_250K;
+			        break;
+		    }
+        }
+	}
+    set_rate_channel(data_rate, rf_ch_num);
 
 	NRF24L01_WritePayload(buf, sizeof(buf));
 
@@ -786,24 +786,36 @@ static uint16_t CFLIE_callback()
 // Generate address to use from TX id and manufacturer id (STM32 unique id)
 static uint8_t CFLIE_initialize_rx_tx_addr()
 {
+    // CFlie uses fixed address
     rx_tx_addr[0] = 
     rx_tx_addr[1] = 
     rx_tx_addr[2] = 
-    rx_tx_addr[3] = 
-    rx_tx_addr[4] = 0xE7; // CFlie uses fixed address
+    rx_tx_addr[3] = 0xE7;
+    
+    if (sub_protocol == CFLIE_AUTO)
+    {
+        // In Auto, we assume default address 0xE7E7E7E7E7
+        rx_tx_addr[4] = 0xE7; 
+    }
+    else
+    {
+        // Otherwise we can set the last 2 hex digits via the option parameter: 0xE7E7E7E7[option]
+        // where option can be <0, 63> decimal, i.e. <0, 3F> hexadecimal
+        rx_tx_addr[4] = option; 
+    }
 
     switch (sub_protocol) {
     case CFLIE_2Mbps:
       data_rate = NRF24L01_BR_2M;
-      rf_ch_num = option;
+      rf_ch_num = 80;
       break;
     case CFLIE_1Mbps:
       data_rate = NRF24L01_BR_1M;
-      rf_ch_num = option;
+      rf_ch_num = 80;
       break;  
     case CFLIE_250kbps:
       data_rate = NRF24L01_BR_250K;
-      rf_ch_num = option;
+      rf_ch_num = 80;
       break;
     default:  
       data_rate = NRF24L01_BR_2M;
