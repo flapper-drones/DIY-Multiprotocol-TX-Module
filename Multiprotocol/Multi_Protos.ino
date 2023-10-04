@@ -191,7 +191,7 @@ const char STR_SUBTYPE_E129[] =       "\x04""E129""C186";
 const char STR_SUBTYPE_FX[] =         "\x05""816\0 ""620\0 ""9630\0""Q560\0""QF012";
 const char STR_SUBTYPE_SGF22[] =      "\x04""F22\0""F22S""J20\0""CX10";
 const char STR_SUBTYPE_JIABAILE[] =   "\x04""Std\0""Gyro";
-const char STR_SUBTYPE_CFLIE[] =      "\x07""Auto\0  ""2Mbps\0 ""1Mbps\0 ""250kbps";
+const char STR_SUBTYPE_CFLIE[] =      "\x07""Default\0  ""2Mbps\0 ""1Mbps\0 ""250kbps";
 #define NO_SUBTYPE		nullptr
 
 #ifdef SEND_CPPM
