@@ -446,223 +446,6 @@ static void send_cmd_packet()
     #endif
 }
 
-// State machine for setting up CRTP logging
-// returns 1 when the state machine has completed, 0 otherwise
-// static uint8_t crtp_log_setup_state_machine()
-// {
-//     uint8_t state_machine_completed = 0;
-//     // A note on the design of this state machine:
-//     //
-//     // Responses from the crazyflie come in the form of ACK payloads.
-//     // There is no retry logic associated with ACK payloads, so it is possible
-//     // to miss a response from the crazyflie. To avoid this, the request
-//     // packet must be re-sent until the expected response is received. However,
-//     // re-sending the same request generates another response in the crazyflie
-//     // Rx queue, which can produce large backlogs of duplicate responses.
-//     //
-//     // To avoid this backlog but still guard against dropped ACK payloads,
-//     // transmit cmd packets (which don't generate responses themselves)
-//     // until an empty ACK payload is received (the crazyflie alternates between
-//     // 0xF3 and 0xF7 for empty ACK payloads) which indicates the Rx queue on the
-//     // crazyflie has been drained. If the queue has been drained and the
-//     // desired ACK has still not been received, it was likely dropped and the
-//     // request should be re-transmit.
-
-//     // log PACKET: ------- 80 01 
-
-//     switch (crtp_log_setup_state) {
-//         case CFLIE_CRTP_LOG_SETUP_STATE_INIT:
-//             toc_size = 0;
-//             next_toc_variable = 0;
-//             vbat_var_id = 0;
-//             extvbat_var_id = 0;
-//             crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_SEND_CMD_GET_INFO;
-//             // fallthrough
-//         case CFLIE_CRTP_LOG_SETUP_STATE_SEND_CMD_GET_INFO:
-//             crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_ACK_CMD_GET_INFO;
-//             packet[0] = crtp_create_header(CRTP_PORT_LOG, CRTP_LOG_CHAN_TOC);
-//             packet[1] = CRTP_LOG_TOC_CMD_INFO;
-//             tx_payload_len = 2;
-//             send_packet();
-//             break;
-
-//         case CFLIE_CRTP_LOG_SETUP_STATE_ACK_CMD_GET_INFO:
-//             if (packet_ack() == PKT_ACKED) {
-//                 if (rx_payload_len >= 3
-//                         && rx_packet[0] == crtp_create_header(CRTP_PORT_LOG, CRTP_LOG_CHAN_TOC)
-//                         && rx_packet[1] == CRTP_LOG_TOC_CMD_INFO) {
-//                     // Received the ACK payload. Save the toc_size
-//                     // and advance to the next state
-//                     toc_size = rx_packet[2];
-//                     crtp_log_setup_state =
-//                             // CFLIE_CRTP_LOG_SETUP_STATE_SEND_CMD_GET_ITEM;
-//                             CFLIE_CRTP_LOG_SETUP_STATE_SEND_CONTROL_CREATE_BLOCK;
-//                     return state_machine_completed;
-//                 } else if (rx_packet[0] == 0xF3 || rx_packet[0] == 0xF7) {
-//                     // "empty" ACK packet received - likely missed the ACK
-//                     // payload we are waiting for.
-//                     // return to the send state and retransmit the request
-//                     crtp_log_setup_state =
-//                             CFLIE_CRTP_LOG_SETUP_STATE_SEND_CMD_GET_INFO;
-//                     return state_machine_completed;
-//                 }
-//             }
-
-//             // Otherwise, send a cmd packet to get the next ACK in the Rx queue
-//             send_cmd_packet();
-//             break;
-
-//         case CFLIE_CRTP_LOG_SETUP_STATE_SEND_CMD_GET_ITEM:
-//             crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_ACK_CMD_GET_ITEM;
-//             packet[0] = crtp_create_header(CRTP_PORT_LOG, CRTP_LOG_CHAN_TOC);
-//             packet[1] = CRTP_LOG_TOC_CMD_ELEMENT;
-//             packet[2] = next_toc_variable;
-//             tx_payload_len = 3;
-//             send_packet();
-//             break;
-
-//         case CFLIE_CRTP_LOG_SETUP_STATE_ACK_CMD_GET_ITEM:
-//             if (packet_ack() == PKT_ACKED) {
-//                 if (rx_payload_len >= 3
-//                         && rx_packet[0] == crtp_create_header(CRTP_PORT_LOG, CRTP_LOG_CHAN_TOC)
-//                         && rx_packet[1] == CRTP_LOG_TOC_CMD_ELEMENT
-//                         && rx_packet[2] == next_toc_variable) {
-//                     // For every element in the TOC we must compare its
-//                     // type (rx_packet[3]), group and name (back to back
-//                     // null terminated strings starting with the fifth byte)
-//                     // and see if it matches any of the variables we need
-//                     // for logging
-//                     //
-//                     // Currently enabled for logging:
-//                     //  - vbatMV (LOG_UINT16)
-//                     //  - extVbatMV (LOG_UINT16)
-//                     //  - rssi (LOG_UINT8)
-//                     if(rx_packet[3] == vbat_var_type
-//                             && (0 == strcmp((char*)&rx_packet[4], pm_group_name))
-//                             && (0 == strcmp((char*)&rx_packet[4 + strlen(pm_group_name) + 1], vbat_var_name))) {
-//                         // Found the vbat element - save it for later
-//                         vbat_var_id = next_toc_variable;
-//                     }
-
-//                     if(rx_packet[3] == extvbat_var_type
-//                             && (0 == strcmp((char*)&rx_packet[4], pm_group_name))
-//                             && (0 == strcmp((char*)&rx_packet[4 + strlen(pm_group_name) + 1], extvbat_var_name))) {
-//                         // Found the extvbat element - save it for later
-//                         extvbat_var_id = next_toc_variable;
-//                     }
-
-//                     if(rx_packet[3] == rssi_var_type
-//                             && (0 == strcmp((char*)&rx_packet[4], radio_group_name))
-//                             && (0 == strcmp((char*)&rx_packet[4 + strlen(radio_group_name) + 1], rssi_var_name))) {
-//                         // Found the rssi element - save it for later
-//                         rssi_var_id = next_toc_variable;
-//                     }
-
-//                     // Advance the toc variable counter
-//                     // If there are more variables, read them
-//                     // If not, move on to the next state
-//                     next_toc_variable += 1;
-//                     if(next_toc_variable >= toc_size) {
-//                         crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_SEND_CONTROL_CREATE_BLOCK;
-//                     } else {
-//                         // There are more TOC elements to get
-//                         crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_SEND_CMD_GET_ITEM;
-//                     }
-//                     return state_machine_completed;
-//                 } else if (rx_packet[0] == 0xF3 || rx_packet[0] == 0xF7) {
-//                     // "empty" ACK packet received - likely missed the ACK
-//                     // payload we are waiting for.
-//                     // return to the send state and retransmit the request
-//                     crtp_log_setup_state =
-//                             CFLIE_CRTP_LOG_SETUP_STATE_SEND_CMD_GET_INFO;
-//                     return state_machine_completed;
-//                 }
-//             }
-
-//             // Otherwise, send a cmd packet to get the next ACK in the Rx queue
-//             send_cmd_packet();
-//             break;
-
-//         case CFLIE_CRTP_LOG_SETUP_STATE_SEND_CONTROL_CREATE_BLOCK:
-//             crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_ACK_CONTROL_CREATE_BLOCK;
-//             packet[0] = crtp_create_header(CRTP_PORT_LOG, CRTP_LOG_CHAN_SETTINGS);
-//             packet[1] = CRTP_LOG_SETTINGS_CMD_CREATE_BLOCK;
-//             packet[2] = CFLIE_TELEM_LOG_BLOCK_ID; // Log block ID
-//             packet[3] = vbat_var_type; // Variable type
-//             packet[4] = vbat_var_id; // ID of the VBAT variable
-//             packet[5] = extvbat_var_type; // Variable type
-//             packet[6] = extvbat_var_id; // ID of the ExtVBat variable
-//             packet[7] = rssi_var_type; // Variable type
-//             packet[8] = rssi_var_id; // ID of the RSSI variable
-//             tx_payload_len = 9;
-//             send_packet();
-//             break;
-
-//         case CFLIE_CRTP_LOG_SETUP_STATE_ACK_CONTROL_CREATE_BLOCK:
-//             if (packet_ack() == PKT_ACKED) {
-//                 if (rx_payload_len >= 2
-//                         && rx_packet[0] == crtp_create_header(CRTP_PORT_LOG, CRTP_LOG_CHAN_SETTINGS)
-//                         && rx_packet[1] == CRTP_LOG_SETTINGS_CMD_CREATE_BLOCK) {
-//                     // Received the ACK payload. Advance to the next state
-//                     crtp_log_setup_state =
-//                             CFLIE_CRTP_LOG_SETUP_STATE_SEND_CONTROL_START_BLOCK;
-//                     return state_machine_completed;
-//                 } else if (rx_packet[0] == 0xF3 || rx_packet[0] == 0xF7) {
-//                     // "empty" ACK packet received - likely missed the ACK
-//                     // payload we are waiting for.
-//                     // return to the send state and retransmit the request
-//                     crtp_log_setup_state =
-//                             CFLIE_CRTP_LOG_SETUP_STATE_SEND_CONTROL_CREATE_BLOCK;
-//                     return state_machine_completed;
-//                 }
-//             }
-
-//             // Otherwise, send a cmd packet to get the next ACK in the Rx queue
-//             send_cmd_packet();
-//             break;
-
-//         case CFLIE_CRTP_LOG_SETUP_STATE_SEND_CONTROL_START_BLOCK:
-//             crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_ACK_CONTROL_START_BLOCK;
-//             packet[0] = crtp_create_header(CRTP_PORT_LOG, CRTP_LOG_CHAN_SETTINGS);
-//             packet[1] = CRTP_LOG_SETTINGS_CMD_START_LOGGING;
-//             packet[2] = CFLIE_TELEM_LOG_BLOCK_ID; // Log block ID 1
-//             packet[3] = CFLIE_TELEM_LOG_BLOCK_PERIOD_10MS; // Log frequency in 10ms units
-//             tx_payload_len = 4;
-//             send_packet();
-//             break;
-
-//         case CFLIE_CRTP_LOG_SETUP_STATE_ACK_CONTROL_START_BLOCK:
-//             if (packet_ack() == PKT_ACKED) {
-//                 if (rx_payload_len >= 2
-//                         && rx_packet[0] == crtp_create_header(CRTP_PORT_LOG, CRTP_LOG_CHAN_SETTINGS)
-//                         && rx_packet[1] == CRTP_LOG_SETTINGS_CMD_START_LOGGING) {
-//                     // Received the ACK payload. Advance to the next state
-//                     crtp_log_setup_state =
-//                             CFLIE_CRTP_LOG_SETUP_STATE_COMPLETE;
-//                     return state_machine_completed;
-//                 } else if (rx_packet[0] == 0xF3 || rx_packet[0] == 0xF7) {
-//                     // "empty" ACK packet received - likely missed the ACK
-//                     // payload we are waiting for.
-//                     // return to the send state and retransmit the request
-//                     crtp_log_setup_state =
-//                             CFLIE_CRTP_LOG_SETUP_STATE_SEND_CONTROL_START_BLOCK;
-//                     return state_machine_completed;
-//                 }
-//             }
-
-//             // Otherwise, send a cmd packet to get the next ACK in the Rx queue
-//             send_cmd_packet();
-//             break;
-
-//         case CFLIE_CRTP_LOG_SETUP_STATE_COMPLETE:
-//             state_machine_completed = 1;
-//             return state_machine_completed;
-//             break;
-//     }
-
-//     return state_machine_completed;
-// }
-
 
 
 
@@ -689,8 +472,7 @@ static uint8_t crtp_log_setup_state_machine()
 
         case CFLIE_CRTP_LOG_RESET:
         {
-            // crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_SEND_CMD_GET_INFO;
-            crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_SEND_CONTROL_CREATE_BLOCK;
+            crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_SEND_CMD_GET_INFO;
             packet[0] = crtp_create_header(CRTP_PORT_LOG, CRTP_LOG_CHAN_SETTINGS);
             packet[1] = CRTP_LOG_SETTINGS_CMD_RESET_LOGGING;
             tx_payload_len = 2;
@@ -766,12 +548,7 @@ static uint8_t crtp_log_setup_state_machine()
                     }
 
                     
-                    // if (var_type == extvbat_var_type &&
-                    //     strcmp(group, pm_group_name) == 0 &&
-                    //     strcmp(name, extvbat_var_name) == 0) {
-                    //     extvbat_var_id = next_toc_variable;
-                    // }
-
+            
                     
                     if (var_type == rssi_var_type &&
                         strcmp(group, radio_group_name) == 0 &&
@@ -779,11 +556,7 @@ static uint8_t crtp_log_setup_state_machine()
                         rssi_var_id = next_toc_variable;
                     }
 
-                    if (var_type == isPressed_var_type &&
-                        strcmp(group, flapper_group_name) == 0 &&
-                        strcmp(name, isPressed_var_name) == 0) {
-                        isPressed_var_id = next_toc_variable;
-                    }
+                    
 
                  
                     next_toc_variable++;
@@ -809,39 +582,17 @@ static uint8_t crtp_log_setup_state_machine()
             STAV = 6;
             packet[0] = crtp_create_header(CRTP_PORT_LOG, CRTP_LOG_CHAN_SETTINGS);
             packet[1] = CRTP_LOG_SETTINGS_CMD_CREATE_BLOCK;
-            // packet[1] = 0x06;
+            
             packet[2] = CFLIE_TELEM_LOG_BLOCK_ID; 
 
-
-            packet[3] = 0x04; //INT8
-            packet[4] = 0x07; //isPressed_var_id
-            tx_payload_len = 5;
-
-            // uint8_t idx = 3;
+            packet[3] = LOG_UINT16;
+            packet[4] = vbat_var_id;
 
            
-            // if (vbat_var_id != 0xFF) {
-            //     packet[idx++] = 0x04;
-            //     packet[idx++] = 0x07;
-            // }
+
+            tx_payload_len = 5;
 
 
-            // if (extvbat_var_id != 0xFF) {
-            //     packet[idx++] = extvbat_var_id;
-            //     packet[idx++] = extvbat_var_type;
-            // }
-            // if (rssi_var_id != 0xFF) {
-            //     packet[idx++] = rssi_var_id;
-            //     packet[idx++] = rssi_var_type;
-            // }
-
-            // if (isPressed_var_id != 0xFF) {
-            //     packet[idx++] = isPressed_var_id;
-            //     packet[idx++] = isPressed_var_type;
-            // }
-
-
-            // tx_payload_len = idx;
             send_packet();
             break;
         }
@@ -909,174 +660,13 @@ static uint8_t crtp_log_setup_state_machine()
 }
 
 
-// static uint8_t crtp_log_setup_state_machine()
-// {
-//     uint8_t state_machine_completed = 0;
+static uint8_t getVbatV(uint8_t b1, uint8_t b2)
+{   
+    uint16_t vbatMV = (b2 << 8) | b1;
+    uint8_t vbatV = (uint8_t) (vbatMV / 100);
 
-//     switch (crtp_log_setup_state) {
-//         case CFLIE_CRTP_LOG_SETUP_STATE_INIT:
-//         {
-//             toc_size = 0;
-//             next_toc_variable = 0;
-
-//             isPressed_var_id = 0xFF; // Reset the variable ID
-
-//             crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_SEND_CMD_GET_INFO;
-//             // fallthrough
-//         }
-
-//         case CFLIE_CRTP_LOG_SETUP_STATE_SEND_CMD_GET_INFO:
-//         {
-//             crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_ACK_CMD_GET_INFO;
-//             packet[0] = crtp_create_header(CRTP_PORT_LOG, CRTP_LOG_CHAN_TOC);
-//             packet[1] = CRTP_LOG_TOC_CMD_INFO;
-//             tx_payload_len = 2;
-//             send_packet();
-//             break;
-//         }
-
-//         case CFLIE_CRTP_LOG_SETUP_STATE_ACK_CMD_GET_INFO:
-//         {
-//             if (packet_ack() == PKT_ACKED) {
-//                 if (rx_payload_len >= 3 &&
-//                     rx_packet[0] == crtp_create_header(CRTP_PORT_LOG, CRTP_LOG_CHAN_TOC) &&
-//                     rx_packet[1] == CRTP_LOG_TOC_CMD_INFO) {
-                    
-//                     toc_size = rx_packet[2];
-//                     crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_SEND_CMD_GET_ITEM;
-//                     return state_machine_completed;
-//                 } else if (rx_packet[0] == 0xF3 || rx_packet[0] == 0xF7) {
-//                     // Retry
-//                     crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_SEND_CMD_GET_INFO;
-//                     return state_machine_completed;
-//                 }
-//             }
-//             send_cmd_packet(); 
-//             break;
-//         }
-
-//         case CFLIE_CRTP_LOG_SETUP_STATE_SEND_CMD_GET_ITEM:
-//         {
-//             crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_ACK_CMD_GET_ITEM;
-//             packet[0] = crtp_create_header(CRTP_PORT_LOG, CRTP_LOG_CHAN_TOC);
-//             packet[1] = CRTP_LOG_TOC_CMD_ELEMENT;
-//             packet[2] = next_toc_variable;
-//             tx_payload_len = 3;
-//             send_packet();
-//             break;
-//         }
-
-//         case CFLIE_CRTP_LOG_SETUP_STATE_ACK_CMD_GET_ITEM:
-//         {
-//             if (packet_ack() == PKT_ACKED) {
-//                 if (rx_payload_len >= 3 &&
-//                     rx_packet[0] == crtp_create_header(CRTP_PORT_LOG, CRTP_LOG_CHAN_TOC) &&
-//                     rx_packet[1] == CRTP_LOG_TOC_CMD_ELEMENT &&
-//                     rx_packet[2] == next_toc_variable) {
-
-//                     uint8_t var_type = rx_packet[3];
-//                     char *group = (char*)&rx_packet[4];
-//                     char *name  = group + strlen(group) + 1;
-
-//                     // Match isPressed
-//                     if (var_type == isPressed_var_type &&
-//                         strcmp(group, flapper_group_name) == 0 &&
-//                         strcmp(name, isPressed_var_name) == 0) {
-//                         isPressed_var_id = next_toc_variable;
-//                     }
-
-//                     next_toc_variable++;
-//                     if (next_toc_variable >= toc_size) {
-//                         crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_SEND_CONTROL_CREATE_BLOCK;
-//                     } else {
-//                         crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_SEND_CMD_GET_ITEM;
-//                     }
-//                     return state_machine_completed;
-//                 } else if (rx_packet[0] == 0xF3 || rx_packet[0] == 0xF7) {
-//                     crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_SEND_CMD_GET_ITEM;
-//                     return state_machine_completed;
-//                 }
-//             }
-//             send_cmd_packet();
-//             break;
-//         }
-
-//         case CFLIE_CRTP_LOG_SETUP_STATE_SEND_CONTROL_CREATE_BLOCK:
-//         {
-//             crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_ACK_CONTROL_CREATE_BLOCK;
-//             packet[0] = crtp_create_header(CRTP_PORT_LOG, CRTP_LOG_CHAN_SETTINGS);
-//             packet[1] = CRTP_LOG_SETTINGS_CMD_CREATE_BLOCK;
-//             packet[2] = CFLIE_TELEM_LOG_BLOCK_ID;
-
-//             uint8_t idx = 3;
-
-//             if (isPressed_var_id != 0xFF) {
-//                 packet[idx++] = isPressed_var_id;
-//                 packet[idx++] = isPressed_var_type;
-//             }
-
-//             tx_payload_len = idx;
-//             send_packet();
-//             break;
-//         }
-
-//         case CFLIE_CRTP_LOG_SETUP_STATE_ACK_CONTROL_CREATE_BLOCK:
-//         {
-//             if (packet_ack() == PKT_ACKED) {
-//                 if (rx_payload_len >= 2 &&
-//                     rx_packet[0] == crtp_create_header(CRTP_PORT_LOG, CRTP_LOG_CHAN_SETTINGS) &&
-//                     rx_packet[1] == CRTP_LOG_SETTINGS_CMD_CREATE_BLOCK) {
-//                     crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_SEND_CONTROL_START_BLOCK;
-//                     return state_machine_completed;
-//                 } else if (rx_packet[0] == 0xF3 || rx_packet[0] == 0xF7) {
-//                     crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_SEND_CONTROL_CREATE_BLOCK;
-//                     return state_machine_completed;
-//                 }
-//             }
-//             send_cmd_packet();
-//             break;
-//         }
-
-//         case CFLIE_CRTP_LOG_SETUP_STATE_SEND_CONTROL_START_BLOCK:
-//         {
-//             crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_ACK_CONTROL_START_BLOCK;
-//             packet[0] = crtp_create_header(CRTP_PORT_LOG, CRTP_LOG_CHAN_SETTINGS);
-//             packet[1] = CRTP_LOG_SETTINGS_CMD_START_LOGGING;
-//             packet[2] = CFLIE_TELEM_LOG_BLOCK_ID;
-//             packet[3] = CFLIE_TELEM_LOG_BLOCK_PERIOD_10MS;
-//             tx_payload_len = 4;
-//             send_packet();
-//             break;
-//         }
-
-//         case CFLIE_CRTP_LOG_SETUP_STATE_ACK_CONTROL_START_BLOCK:
-//         {
-//             if (packet_ack() == PKT_ACKED) {
-//                 if (rx_payload_len >= 2 &&
-//                     rx_packet[0] == crtp_create_header(CRTP_PORT_LOG, CRTP_LOG_CHAN_SETTINGS) &&
-//                     rx_packet[1] == CRTP_LOG_SETTINGS_CMD_START_LOGGING) {
-//                     crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_COMPLETE;
-//                     return state_machine_completed;
-//                 } else if (rx_packet[0] == 0xF3 || rx_packet[0] == 0xF7) {
-//                     crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_SEND_CONTROL_START_BLOCK;
-//                     return state_machine_completed;
-//                 }
-//             }
-//             send_cmd_packet();
-//             break;
-//         }
-
-//         case CFLIE_CRTP_LOG_SETUP_STATE_COMPLETE:
-//         {
-//             state_machine_completed = 1;
-//             return state_machine_completed;
-//             break;
-//         }
-//     }
-
-//     return state_machine_completed;
-// }
-
+    return vbatV;
+}
 
 
 
@@ -1090,24 +680,15 @@ static void cflie_process_logdata_ack(void)
 
 //     // CRTP header 
     if (rx_payload_len >= 3 && rx_packet[0] == crtp_create_header(CRTP_PORT_LOG, CRTP_LOG_CHAN_LOGDATA) && rx_packet[1] == CFLIE_TELEM_LOG_BLOCK_ID) {
+		
+		v_lipo2 = getVbatV(rx_packet[5], rx_packet[6]);
         
-        v_lipo1 = rx_packet[0];		
-		v_lipo2 = rx_packet[1];		
-		RX_RSSI = rx_packet[31];	
-        TX_RSSI = rx_packet[3];
-        RX_LQI = rx_packet[4];
-        TX_LQI = rx_packet[5];
-
-
 
         telemetry_link = 1; 
          
     }
 
-    // v_lipo1 = rx_packet[0];
-    // v_lipo2 = rx_packet[1];
-    // RX_RSSI = rx_payload_len;
-    // RX_LQI = rx_packet[5];
+    
     
 
       
@@ -1164,7 +745,6 @@ static uint16_t CFLIE_callback()
         case PKT_PENDING:
             return PACKET_CHKTIME;                 // packet send not yet complete
         case PKT_ACKED:
-            // phase = CFLIE_DATA;
             phase = CFLIE_INIT_CRTP_LOG;
             // PROTOCOL_SetBindState(0);
             // MUSIC_Play(MUSIC_DONE_BINDING);
@@ -1176,43 +756,16 @@ static uint16_t CFLIE_callback()
         break;
 
     case CFLIE_DATA:
-		// #ifdef MULTI_SYNC
-		// 	telemetry_set_input_sync(CFLIE_PACKET_PERIOD);
-		// #endif
-		// if (Model.proto_opts[PROTOOPTS_TELEMETRY] == TELEM_ON_CRTPLOG) {
-        //     update_telemetry_crtplog();
-        // } else if (Model.proto_opts[PROTOOPTS_TELEMETRY] == TELEM_ON_ACKPKT) {
-        //     update_telemetry_ackpkt();
-        // }
 
         if (packet_ack() == PKT_PENDING)
             return PACKET_CHKTIME;         // packet send not yet complete
-        
 
-        // if(rx_payload_len >= 13) {
-        //     v_lipo1 = rx_packet[2] | (rx_packet[3] << 8);
-        //     v_lipo2 = rx_packet[1]; 
-        //     RX_RSSI = rx_payload_len; 
-        //     TX_RSSI = rx_packet[2]; 
-        //     RX_LQI = rx_packet[3]; 
-        //     TX_LQI = rx_packet[4];    
-        // }
-
-        
-
-        // if(packet_ack() == PKT_ACKED)
         cflie_process_logdata_ack();
 
 
         send_cmd_packet();
 
-        
-
-        
-    
-
-         
-        // telemetry_link = 1;
+ 
 
         break;
     }
