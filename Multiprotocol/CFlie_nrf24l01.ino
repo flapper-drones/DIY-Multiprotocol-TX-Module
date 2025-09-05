@@ -165,6 +165,11 @@ static const char* radio_group_name = "radio";
 static const char* rssi_var_name = "rssi";
 static const uint8_t rssi_var_type = LOG_UINT8;
 
+static float ratio = 1.948; // Default sensor ratio compensation
+
+// 8.4 - 4.3
+// 6.8 - 3.5
+
 
 enum {
     PROTOOPTS_TELEMETRY = 0,
@@ -537,6 +542,10 @@ static uint8_t crtp_log_setup_state_machine()
 
                  
                     next_toc_variable++;
+                    if(vbat_var_id != 0xFF && rssi_var_id != 0xFF) {
+                        // We found all the variables we need, skip to creating the log block
+                        crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_SEND_CONTROL_CREATE_BLOCK; 
+                    }
                     if (next_toc_variable >= toc_size) {
                         crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_SEND_CONTROL_CREATE_BLOCK;
                     } else {
@@ -641,7 +650,7 @@ static uint8_t getVbatV(uint8_t b1, uint8_t b2)
 {   
     uint16_t vbatMV = (b2 << 8) | b1;
     // Division by 100 to convert mV to dV for correct display in Sensors screen
-    uint8_t vbatV = (uint8_t) (vbatMV / 10);
+    uint8_t vbatV = (uint8_t) (vbatMV / 100);
 
     return vbatV;
 }
@@ -649,7 +658,7 @@ static uint8_t getVbatV(uint8_t b1, uint8_t b2)
 
 
 static void cflie_process_logdata_ack(void)
-{
+{   
     // If the ry_payload_len is 0, there is no ACK payload
     if (rx_payload_len == 0) return;
 
@@ -657,7 +666,10 @@ static void cflie_process_logdata_ack(void)
     if (rx_payload_len >= 3 && rx_packet[0] == crtp_create_header(CRTP_PORT_LOG, CRTP_LOG_CHAN_LOGDATA) && rx_packet[1] == CFLIE_TELEM_LOG_BLOCK_ID) {
 		
         // Vbat value - conversion from 2 bytes to one uint8_t
-		v_lipo1 = getVbatV(rx_packet[5], rx_packet[6]);
+		// v_lipo1 = getVbatV(rx_packet[5], rx_packet[6]);
+
+        // Vbat value - conversion from 2 bytes to one uint8_t and correct for default ratio
+        v_lipo1 = (uint8_t) (ratio * getVbatV(rx_packet[5], rx_packet[6]));
 
         // RSSI value 
         // RX_RSSI = rx_packet[7];
