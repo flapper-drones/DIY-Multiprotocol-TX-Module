@@ -49,8 +49,8 @@ enum {
 // Command definitions for the LOG port's TOC channel
 enum {
     // V1 implementation
-    // CRTP_LOG_TOC_CMD_ELEMENT = 0x00,
-    // CRTP_LOG_TOC_CMD_INFO = 0x01,
+    CRTP_LOG_TOC_CMD_ELEMENT = 0x00,
+    CRTP_LOG_TOC_CMD_INFO = 0x01,
 
     // V2 implementation
     CRTP_LOG_TOC_CMD_ELEMENT_V2 = 0x02,
@@ -141,12 +141,6 @@ enum {
     CFLIE_CRTP_LOG_SETUP_STATE_ACK_CMD_GET_INFO,
     CFLIE_CRTP_LOG_SETUP_STATE_SEND_CMD_GET_ITEM,
     CFLIE_CRTP_LOG_SETUP_STATE_ACK_CMD_GET_ITEM,
-    // It might be a good idea to add a state here
-    // to send the command to reset the logging engine
-    // to avoid log block ID conflicts. However, there
-    // is not a conflict with the current defaults in
-    // cfclient and I'd rather be able to log from the Tx
-    // and cfclient simultaneously
     CFLIE_CRTP_LOG_SETUP_STATE_SEND_CONTROL_CREATE_BLOCK,
     CFLIE_CRTP_LOG_SETUP_STATE_ACK_CONTROL_CREATE_BLOCK,
     CFLIE_CRTP_LOG_SETUP_STATE_SEND_CONTROL_START_BLOCK,
@@ -159,16 +153,14 @@ enum {
 static uint16_t toc_size;             // Size of the TOC read from the crazyflie
 static uint16_t next_toc_variable;    // State variable keeping track of the next var to read
 static uint16_t vbat_var_id;          // ID of the vbatMV variable
-static uint16_t rssi_var_id;          // ID of the RSSI variable
+
 
 
 // Constants used for finding var IDs from the toc
 static const char* pm_group_name = "pm";
 static const char* vbat_var_name = "vbatMV";
 static const uint8_t vbat_var_type = LOG_UINT16;
-static const char* radio_group_name = "radio";
-static const char* rssi_var_name = "rssi";
-static const uint8_t rssi_var_type = LOG_UINT8;
+
 
 static float ratio = 1.948; // Default sensor ratio compensation
 
@@ -453,7 +445,7 @@ static uint8_t crtp_log_setup_state_machine()
             toc_size = 0;
             next_toc_variable = 0;
             vbat_var_id = 0xFFFF;  
-            rssi_var_id = 0xFFFF;  
+           
 
             crtp_log_setup_state = CFLIE_CRTP_LOG_RESET;
             // fallthrough
@@ -512,32 +504,7 @@ static uint8_t crtp_log_setup_state_machine()
             send_cmd_packet();
             break;
         }
-        {
-            if (packet_ack() == PKT_ACKED) {
-                
-                if (rx_payload_len >= 3 &&
-                    rx_packet[0] == crtp_create_header(CRTP_PORT_LOG, CRTP_LOG_CHAN_TOC) &&
-                    rx_packet[1] == CRTP_LOG_TOC_CMD_INFO_V2)
-                {
-                    
-                    toc_size = (rx_packet[3] << 8) | rx_packet[2];
-
-                    
-                   
-                    crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_SEND_CMD_GET_ITEM;
-                    return state_machine_completed;
-                }
-                else if (rx_packet[0] == 0xF3 || rx_packet[0] == 0xF7) {
-                    
-                    crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_SEND_CMD_GET_INFO;
-                    return state_machine_completed;
-                }
-            }
-
-            send_cmd_packet();
-            break;
-        }
-
+        
         case CFLIE_CRTP_LOG_SETUP_STATE_SEND_CMD_GET_ITEM:
         {
             crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_ACK_CMD_GET_ITEM;
