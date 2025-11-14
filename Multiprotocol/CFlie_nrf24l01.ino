@@ -736,15 +736,29 @@ static uint16_t CFLIE_callback()
         break;
 
     case CFLIE_DATA:
+        switch (packet_ack()) {
+            case PKT_PENDING:
+                // Packet send is not yet complete, just wait
+                return PACKET_CHKTIME;
 
-        if (packet_ack() == PKT_PENDING)
-            return PACKET_CHKTIME;         // packet send not yet complete
+            case PKT_ACKED:
+                // Packet was acknowledged
+                // Process any telemetry data that came in the ACK payload
+                cflie_process_logdata_ack();
+                
+                // Send the next control packet
+                send_cmd_packet();
+                break;
 
-        cflie_process_logdata_ack();
+            case PKT_TIMEOUT:
 
-        send_cmd_packet();
-
-        break;
+                crtp_log_setup_state = CFLIE_CRTP_LOG_SETUP_STATE_INIT;
+                
+                phase = CFLIE_INIT_CRTP_LOG;
+                
+                break;
+        }
+        break;     
     }
     return CFLIE_PACKET_PERIOD;                  // Packet at standard protocol interval
     
